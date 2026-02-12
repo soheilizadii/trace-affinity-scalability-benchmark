@@ -50,12 +50,6 @@ kubectl create configmap teastore-jmeter-browse --from-file=./Jmeter/teastore_br
 kubectl create configmap teastore-jmeter-deployment --from-file=./Theodolite-config/jmeter.yaml
 ```
 
-## Deploy TeaStore and the Kieker–Kafka Bridge in the Kubernetes Cluster  (Helm)
-
-Run the following command to deploy TeaStore as the workload system together with the Kieker–Kafka Bridge using the provided Helm chart:
-```sh
-helm install teastore-observability ./Helm/teastore-observability-chart 
-```
 
 ### Deploy ExplorViz in the Kubernetes Cluster (Helm)
 
@@ -70,6 +64,14 @@ Once all pods are running, the ExplorViz frontend can be accessed via:
 ```sh 
 kubectl port-forward svc/frontend 8082:80
 ```
+
+## Deploy TeaStore and the Kieker–Kafka Bridge in the Kubernetes Cluster  (Helm)
+
+Run the following command to deploy TeaStore as the workload system together with the Kieker–Kafka Bridge using the provided Helm chart:
+```sh
+helm install teastore-observability ./Helm/teastore-observability-chart 
+```
+
 
 ### Start the Benchmark
 
