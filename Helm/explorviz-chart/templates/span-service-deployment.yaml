@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: span-service
+  labels:
+    app: explorviz
+    run: span-service
+spec:
+  replicas: {{ .Values.span.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: span-service
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: span-service
+    spec:
+      securityContext:
+        fsGroup: 1000   
+      terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: wait-for-schema-registry
+          image: curlimages/curl:8.7.1
+          command:
+            - sh
+            - -c
+            - |
+                until curl -sf http://schema-registry:8081/subjects | grep -q "\["; do
+                  echo "Schema Registry not ready yet... sleeping 5s";
+                  sleep 5;
+                done;
+                echo " Schema Registry is ready!";
+
+        - name: wait-for-cassandra
+          image: "{{ .Values.image.cassandra }}:{{ .Values.image.cassandraTag }}"
+          command:
+            - sh
+            - -c
+            - |
+                echo " Waiting for Cassandra keyspace 'explorviz'...";
+                until cqlsh cassandra.default.svc.cluster.local 9042 -u cassandra -p cassandra -e "DESCRIBE KEYSPACE explorviz" >/dev/null 2>&1; do
+                  echo "Keyspace not ready yet... sleeping 5s";
+                  sleep 5;
+                done;
+                echo " Keyspace 'explorviz' is ready!";
+      containers:
+        - name: span-service
+          image: "{{ .Values.image.span }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.span.port }}
+              name: http
+          env:
+            {{- range $key, $value := .Values.span.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+
+          # # ✅ Readiness probe (replaces depends_on)
+          # readinessProbe:
+          #   httpGet:
+          #     path: /q/health
+          #     port: {{ .Values.span.port }}
+          #   initialDelaySeconds: 20
+          #   periodSeconds: 5
+
+          # # ✅ Liveness probe (auto-restart if unhealthy)
+          # livenessProbe:
+          #   httpGet:
+          #     path: /q/health/live
+          #     port: {{ .Values.span.port }}
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 10

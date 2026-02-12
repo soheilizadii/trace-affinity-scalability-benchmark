@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: explorviz
+    run: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: frontend
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: frontend
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: frontend
+          image: "{{ .Values.image.frontend }}:{{ .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.frontend.port }}
+              name: http
+          env:
+            {{- range $key, $value := .Values.frontend.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+
+          # ✅ Readiness probe
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: {{ .Values.frontend.port }}
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 5
+
+          # # ✅ Liveness probe
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: {{ .Values.frontend.port }}
+          #   initialDelaySeconds: 20
+          #   periodSeconds: 10

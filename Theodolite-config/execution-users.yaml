@@ -1,0 +1,26 @@
+apiVersion: theodolite.rocks/v1beta1
+kind: execution
+metadata:
+  name: teastore-users
+spec:
+  benchmark: teastore
+  load:
+    loadType: "NumUsers"
+    loadValues: [1, 5, 10]
+  resources:
+    resourceType: "TransformerInstances"
+    resourceValues: [1, 2, 3]
+  slos:
+    - name: "transformerThroughput"
+      properties:
+        threshold: 12000
+  execution:
+    strategy:
+      name: "RestrictionSearch"
+      restrictions:
+        - "LowerBound"
+      searchStrategy: "LinearSearch"
+    duration: 400 # in seconds
+    repetitions: 1
+    loadGenerationDelay: 100 # in seconds
+  configOverrides: []

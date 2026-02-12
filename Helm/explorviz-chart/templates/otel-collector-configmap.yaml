@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  labels:
+    app: explorviz
+    run: otel-collector
+data:
+  otel-collector-config.yaml: |
+{{ .Files.Get "files/otel/otel-collector-config.yaml" | indent 4 }}

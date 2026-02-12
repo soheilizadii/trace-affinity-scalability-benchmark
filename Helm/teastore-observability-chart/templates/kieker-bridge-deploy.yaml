@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kieker-bridge
+  labels:
+    app: kieker-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kieker-bridge
+  template:
+    metadata:
+      labels:
+        app: kieker-bridge
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: kieker-kafka-bridge
+          image: soheilizadii/kieker-kafka-bridge:latest-f
+          imagePullPolicy: Always
+          args:
+            - -lp
+            - "10001"
+            - -bs
+            - "kafka:9092"
+            - -t
+            - "kieker-records"
+            - -c
+            - "/config/kafka-bridge.properties"
+          ports:
+            - containerPort: 10001
+              name: tcp
+              protocol: TCP
+            - name: metrics
+              containerPort: 9465
+              protocol: TCP
+          env:
+            - name: LOG_LEVEL
+              value: "INFO"
+          volumeMounts:
+            - name: cfg
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: cfg
+          configMap:
+            name: kafka-bridge-config

@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-image
+  labels:
+    app: teastore
+    run: teastore-image
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-image
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+      labels:
+        app: teastore
+        run: teastore-image
+    spec:
+      terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: wait-for-teastore-recommender
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for teastore-recommender to be ready..."
+              until nc -z teastore-recommender 8080; do
+                echo "Still waiting for teastore-recommender..."
+                sleep 3
+              done
+              echo "teastore-recommender is ready!"
+        - name: wait-for-kieker-bridge
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for kieker-bridge service to be ready..."
+              until nc -z kieker-bridge 10001; do
+                echo "Still waiting for kieker-bridge on port 10001..."
+                sleep 3
+              done
+              echo "kieker-bridge is ready!"
+      containers:
+        - name: teastore-image
+          image: "{{ .Values.image.image }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: HOST_NAME
+              value: "teastore-image"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+            - name: RABBITMQ_HOST
+              value: "teastore-rabbitmq"
+          volumeMounts:
+            - name: kieker-config-volume
+              mountPath: /kieker/config/kieker.monitoring.properties
+              subPath: kieker.monitoring.properties
+              readOnly: true
+          resources:
+            requests:
+              cpu: {{ .Values.imageService.resources.requests.cpu }}
+              memory: {{ .Values.imageService.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.imageService.resources.limits.cpu }}
+              memory: {{ .Values.imageService.resources.limits.memory }}
+      volumes:
+        - name: kieker-config-volume
+          configMap:
+            name: kieker-config

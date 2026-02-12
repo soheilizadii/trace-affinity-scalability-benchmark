@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-cassandra
+  labels:
+    app: explorviz
+    run: init-cassandra
+spec:
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: init-cassandra
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-cassandra
+          image: busybox
+          command:
+              - sh
+              - -c
+              - |
+                  until nslookup cassandra.default.svc.cluster.local >/dev/null 2>&1; do
+                    echo "Waiting for Cassandra service DNS...";
+                    sleep 5;
+                  done;
+
+                  until nc -z cassandra.default.svc.cluster.local 9042; do
+                    echo "Waiting for Cassandra to accept connections...";
+                    sleep 5;
+                  done;
+
+                  echo "Cassandra is ready!"
+      containers:
+        - name: init-cassandra
+          image: explorviz/init-cassandra
+          env:
+            - name: CASSANDRA_CONTACT_POINT
+              value: "cassandra.default.svc.cluster.local"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "🚀 Initializing Cassandra schema..."
+              cqlsh cassandra.default.svc.cluster.local 9042 -f /init.cql
+              echo "🎉 Initialization complete!"

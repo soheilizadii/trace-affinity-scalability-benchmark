@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-collab
+  labels:
+    app: explorviz
+    run: redis-collab
+spec:
+  selector:
+    app: explorviz
+    run: redis-collab
+  ports:
+    - name: redis
+      port: {{ .Values.redis.port }}
+      targetPort: {{ .Values.redis.port }}
+      protocol: TCP
+  type: {{ .Values.service.type}}

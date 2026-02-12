@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  labels:
+    app: explorviz
+    run: kafka
+spec:
+  serviceName: kafka
+  replicas: {{ .Values.kafka.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: kafka
+  template:
+    metadata:
+      annotations:
+         sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: kafka
+    spec:
+     
+      containers:
+        - name: kafka
+          image: "{{ .Values.image.kafka }}:{{ .Values.image.kafkaTag }}"
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: external
+              containerPort: {{ .Values.kafka.ports.external }}
+            - name: jmx
+              containerPort: {{ .Values.kafka.ports.jmx }}
+
+          env:
+            {{- range $key, $value := .Values.kafka.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+
+          # Mount Kafka volumes and init script
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+            - name: kafka-secrets
+              mountPath: /etc/kafka/secrets
+            # - name: kafka-kraft-init
+            #   mountPath: /tmp/update_run.sh
+            #   subPath: kafka_kraft_init.sh
+
+          # Run init script before starting Kafka
+          command:
+              - bash
+              - -c
+              - |
+                # Remove ZooKeeper checks
+                sed -i '/KAFKA_ZOOKEEPER_CONNECT/d' /etc/confluent/docker/configure
+                sed -i 's/cub zk-ready/echo ignore zk-ready/' /etc/confluent/docker/ensure
+
+                # Generate Kafka configs first (creates /etc/kafka/kafka.properties)
+                /etc/confluent/docker/configure
+
+                # Pick the config file to use for formatting
+                CONFIG_FILE="/etc/kafka/kafka.properties"
+                if [ ! -f "$CONFIG_FILE" ]; then
+                  if [ -f /etc/kafka/kraft/server.properties ]; then
+                    CONFIG_FILE="/etc/kafka/kraft/server.properties"
+                  elif [ -f /etc/kafka/server.properties ]; then
+                    CONFIG_FILE="/etc/kafka/server.properties"
+                  fi
+                fi
+                echo "Using config file: $CONFIG_FILE"
+
+                # Format the KRaft storage once
+                if [ ! -f /var/lib/kafka/data/meta.properties ]; then
+                  echo "Formatting storage for KRaft..."
+                  kafka-storage format --ignore-formatted --cluster-id=$(kafka-storage random-uuid) -c "$CONFIG_FILE"
+                fi
+
+                exec /etc/confluent/docker/run
+          # readinessProbe:
+          #   exec:
+          #     command:
+          #       - sh
+          #       - -c
+          #       - kafka-topics --bootstrap-server localhost:9092 --list || exit 1 
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 15
+
+      volumes:
+        - name: kafka-secrets
+          emptyDir: {}
+        # - name: kafka-kraft-init
+        #   configMap:
+        #     name: kafka-kraft-init
+
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.kafka.storage.size }}

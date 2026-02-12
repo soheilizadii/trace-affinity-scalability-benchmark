@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-user
+  labels:
+    app: explorviz
+    run: mongo-user
+spec:
+  serviceName: mongo-user
+  replicas: {{ .Values.mongoUser.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: mongo-user
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: mongo-user
+    spec:
+      securityContext:
+        fsGroup: 1000   
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: mongo-user
+          image: "{{ .Values.image.mongo }}:{{ .Values.image.mongoTag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.mongoUser.port }}
+              name: mongo
+          volumeMounts:
+            - name: mongo-user-data
+              mountPath: /data/db
+            - name: mongo-user-config
+              mountPath: /data/configdb
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-user-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.mongoUser.storage.data }}
+    - metadata:
+        name: mongo-user-config
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.mongoUser.storage.config }}

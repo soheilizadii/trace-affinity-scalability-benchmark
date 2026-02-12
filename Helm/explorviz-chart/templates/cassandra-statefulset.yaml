@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  labels:
+    app: explorviz
+    run: cassandra
+spec:
+  serviceName: cassandra
+  replicas: {{ .Values.cassandra.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: cassandra
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: cassandra
+    spec:
+      securityContext:
+        fsGroup: 1000   
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: cassandra
+          image: "{{ .Values.image.cassandra }}:{{ .Values.image.cassandraTag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.cassandra.port }}
+              name: cql
+          env:
+            {{- range $key, $value := .Values.cassandra.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          volumeMounts:
+            - name: cassandra-data
+              mountPath: /var/lib/cassandra
+            - name: cassandra-entrypoint
+              mountPath: /usr/local/bin/custom-entrypoint.sh
+              subPath: custom-entrypoint.sh
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - cqlsh -u cassandra -p cassandra -e "describe keyspaces"
+            initialDelaySeconds: 40
+            periodSeconds: 15
+      volumes:
+        - name: cassandra-entrypoint
+          configMap:
+            name: cassandra-entrypoint
+  volumeClaimTemplates:
+    - metadata:
+        name: cassandra-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.cassandra.storage.size }}

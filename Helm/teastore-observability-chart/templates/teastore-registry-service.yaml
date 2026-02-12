@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-registry
+  labels: 
+     app: teastore
+     run: teastore-registry 
+spec:
+  type: {{ .Values.service.type }}
+  selector:  
+    app: teastore
+    run: teastore-registry 
+  ports:
+    - port: {{ .Values.service.port }}
+      protocol: TCP

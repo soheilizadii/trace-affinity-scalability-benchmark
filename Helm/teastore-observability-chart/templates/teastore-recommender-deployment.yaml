@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-recommender
+  labels:
+    app: teastore
+    run: teastore-recommender
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-recommender
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+      labels:
+        app: teastore
+        run: teastore-recommender
+    spec:
+      terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: wait-for-teastore-auth
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for teastore-auth to be ready..."
+              until nc -z teastore-auth 8080; do
+                echo "Still waiting for teastore-auth on port 8080..."
+                sleep 3
+              done
+              echo "teastore-auth is ready!"
+        - name: wait-for-kieker-bridge
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for kieker-bridge service to be ready..."
+              until nc -z kieker-bridge 10001; do
+                echo "Still waiting for kieker-bridge on port 10001..."
+                sleep 3
+              done
+              echo "kieker-bridge is ready!"
+      containers:
+        - name: teastore-recommender
+          image: "{{ .Values.image.recommender }}:{{ .Values.image.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: HOST_NAME
+              value: "teastore-recommender"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+            - name: RABBITMQ_HOST
+              value: "teastore-rabbitmq"
+          volumeMounts:
+            - name: kieker-config
+              mountPath: /kieker/config/kieker.monitoring.properties
+              subPath: kieker.monitoring.properties
+          # readinessProbe:
+          #   httpGet:
+          #     path: "/tools.descartes.teastore.recommender/rest/train/isready"
+          #     port: {{ .Values.service.port }}
+          #     scheme: HTTP
+          #   initialDelaySeconds: 15
+          #   timeoutSeconds: 5
+          #   periodSeconds: 10
+          #   successThreshold: 1
+          #   failureThreshold: 3
+          resources:
+            requests:
+              cpu: {{ .Values.recommender.resources.requests.cpu }}
+              memory: {{ .Values.recommender.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.recommender.resources.limits.cpu }}
+              memory: {{ .Values.recommender.resources.limits.memory }}
+      volumes:
+        - name: kieker-config
+          configMap:
+            name: kieker-config

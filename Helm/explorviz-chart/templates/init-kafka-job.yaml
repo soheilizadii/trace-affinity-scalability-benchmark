@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-kafka
+  labels:
+    app: explorviz
+    run: init-kafka
+spec:
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: init-kafka
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+       - name: wait-for-kafka
+         image: confluentinc/cp-kafka:7.3.0
+         command:
+            - sh
+            - -c
+            - |
+              echo "⏳ Waiting for Kafka readiness..."
+              until kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+                echo "Kafka not ready yet... sleeping 5s"
+                sleep 5
+              done
+              echo "✅ Kafka is ready!"
+              sleep 5
+      containers:
+        - name: init-kafka
+          image: {{ .Values.image.kafka }}:{{ .Values.image.kafkaTag }}
+          env:
+            - name: KAFKA_INT_PORT
+              value: "9092"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+                echo "Kafka not ready yet, retrying..."
+                sleep 5
+              done
+
+              kafka-topics --create --if-not-exists --topic otlp_spans \
+                --bootstrap-server kafka:9092 --replication-factor 1 --partitions 20
+              kafka-topics --create --if-not-exists --topic explorviz-spans \
+                --bootstrap-server kafka:9092 --replication-factor 1 --partitions 20
+              kafka-topics --create --if-not-exists --topic token-events \
+                --bootstrap-server kafka:9092 --replication-factor 1 --partitions 20
+              kafka-topics --create --if-not-exists --topic token-events-table \
+                --bootstrap-server kafka:9092 --replication-factor 1 --partitions 20
+              kafka-topics --bootstrap-server kafka:9092 --list
+              kafka-topics --create --if-not-exists --topic kieker-records \
+                --bootstrap-server kafka:9092 --replication-factor 1 --partitions 20
+

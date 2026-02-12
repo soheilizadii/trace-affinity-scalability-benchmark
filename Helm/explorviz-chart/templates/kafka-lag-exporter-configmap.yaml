@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-lag-exporter-config
+  labels:
+    app: explorviz
+    run: kafka-lag-exporter
+data:
+  application.conf: |
+{{ .Files.Get "files/monitoring/kafka-lag-exporter/application.conf" | indent 4 }}

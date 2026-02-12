@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-registry
+  labels: 
+     app: teastore
+     run: teastore-registry
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels: 
+      app: teastore
+      run: teastore-registry 
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+      labels: 
+         app: teastore
+         run: teastore-registry 
+    spec:
+      initContainers:
+        - name: wait-for-teastore-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z teastore-db 3306; do
+                echo "🕓 teastore-db not ready yet... sleeping 5s"
+                sleep 5
+              done
+              echo "✅ teastore-db is ready!"
+      containers:
+        - name: teastore-registry
+          image: "{{ .Values.image.registry }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: 8080
+          #     scheme: HTTP
+          #   initialDelaySeconds: 5     # wait 5s before first check
+          #   periodSeconds: 5           # check every 5s
+          #   failureThreshold: 6        # fail after 6 * 5s = 30s
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: 8080
+          #     scheme: HTTP
+          #   initialDelaySeconds: 30    # wait 30s before first check
+          #   periodSeconds: 10          # check every 10s
+          #   failureThreshold: 3          

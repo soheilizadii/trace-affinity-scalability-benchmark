@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-bridge-config
+data:
+  kafka-bridge.properties: |-  
+    kieker.bridge.listen.port=10001
+    kieker.bridge.buffer.size=655350
+    kafka.bootstrap.servers=kafka:9092
+    kafka.topic.name=kieker-records
+    kafka.producer.acks=1
+    kafka.producer.retries=3
+    kafka.producer.linger.ms=5
+    kafka.producer.batch.size=16384
+    bridge.filter.operation.records.only=true
+    bridge.log.every=1000
+

@@ -1,0 +1,94 @@
+# ---------- Images ----------
+image:
+  registry: kieker/teastore-registry
+  db: kieker/teastore-db
+  persistence: kieker/teastore-persistence
+  auth: kieker/teastore-auth
+  recommender: kieker/teastore-recommender
+  image: kieker/teastore-image
+  webui: kieker/teastore-webui
+  jmeter: kieker/teastore-jmeter
+  otelTransformer: kieker/otel-transformer
+  tag: kieker-2.0.2
+
+# ---------- Global Service Defaults ----------
+service:
+  port: 8080
+  type: ClusterIP
+
+# ---------- DB Service ----------
+db:
+  serviceType: ClusterIP
+  port: 3306
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1000Mi
+    limits:
+      cpu: 2000m
+      memory: 2000Mi
+
+# ---------- Persistence Service ----------
+persistence:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+# ---------- Auth Service ----------
+auth:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ---------- Recommender Service ----------
+recommender:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+# ---------- Image Service ----------
+imageService:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ---------- WebUI Service ----------
+webui:
+  serviceType: NodePort # or LoadBalancer if exposing externally
+  nodePort: 30080 # optional: set a fixed NodePort
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 700m
+      memory: 1024Mi
+
+# ---------- Registry Service ----------
+registry:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ---------- Global ----------
+replicaCount: 1

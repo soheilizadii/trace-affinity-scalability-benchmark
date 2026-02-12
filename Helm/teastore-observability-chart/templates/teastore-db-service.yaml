@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-db
+  labels:
+    app: teastore
+    run: teastore-db
+spec:
+  type: {{ .Values.db.serviceType }}
+  selector:
+    app: teastore
+    run: teastore-db
+  ports:
+    - name: mysql
+      port: {{ .Values.db.port }}
+      protocol: TCP

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-transformer-config
+data:
+  otel-transformer.properties: |-
+    kieker.tools.oteltransformer.stages.OpenTelemetryExporterStage.ExportType=GRPC
+    kieker.tools.oteltransformer.stages.OpenTelemetryExporterStage.ExportURL=http://otel-collector:55678
+    kieker.tools.oteltransformer.stages.OpenTelemetryExporterStage.ExplorVizTokenValue=mytokenvalue
+    kieker.tools.oteltransformer.stages.OpenTelemetryExporterStage.ExplorVizTokenSecret=mytokensecret

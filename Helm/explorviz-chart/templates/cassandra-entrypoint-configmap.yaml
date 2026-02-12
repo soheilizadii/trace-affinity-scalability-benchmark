@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cassandra-entrypoint
+  labels:
+    app: explorviz
+    run: cassandra
+data:
+  custom-entrypoint.sh: |
+{{ .Files.Get "files/cassandra/custom-entrypoint.sh" | indent 4 }}

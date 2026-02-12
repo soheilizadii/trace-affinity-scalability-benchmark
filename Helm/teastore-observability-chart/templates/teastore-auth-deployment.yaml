@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-auth
+  labels:
+    app: teastore
+    run: teastore-auth
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-auth
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+      labels:
+        app: teastore
+        run: teastore-auth
+    spec:
+      terminationGracePeriodSeconds: 0
+
+      initContainers:
+        - name: wait-for-teastore-persistence
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for teastore-persistence to be ready..."
+              until nc -z teastore-persistence 8080; do
+                echo "Still waiting for teastore-persistence on port 8080..."
+                sleep 3
+              done
+              echo "teastore-persistence is ready!"
+        - name: wait-for-kieker-bridge
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for kieker-bridge service to be ready..."
+              until nc -z kieker-bridge 10001; do
+                echo "Still waiting for kieker-bridge on port 10001..."
+                sleep 3
+              done
+              echo "kieker-bridge is ready!"
+      containers:
+        - name: teastore-auth
+          image: "{{ .Values.image.auth }}:{{ .Values.image.tag }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: HOST_NAME
+              value: "teastore-auth"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+            - name: RABBITMQ_HOST
+              value: "teastore-rabbitmq"
+
+          # ✅ Mount shared Kieker ConfigMap
+          volumeMounts:
+            - name: kieker-config-volume
+              mountPath: /kieker/config/kieker.monitoring.properties
+              subPath: kieker.monitoring.properties
+
+          readinessProbe:
+            httpGet:
+              path: "/tools.descartes.teastore.auth/rest/ready/isready"
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: {{ .Values.auth.resources.requests.cpu }}
+              memory: {{ .Values.auth.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.auth.resources.limits.cpu }}
+              memory: {{ .Values.auth.resources.limits.memory }}
+
+      # ✅ Declare volume for Kieker ConfigMap
+      volumes:
+        - name: kieker-config-volume
+          configMap:
+            name: kieker-config

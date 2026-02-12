@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  labels:
+    app: explorviz
+    run: otel-collector
+spec:
+  replicas: {{ .Values.otelCollector.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: otel-collector
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: otel-collector
+    spec:
+      securityContext:
+        fsGroup: 1000   
+      terminationGracePeriodSeconds: 10
+      initContainers:
+        - name: wait-for-schema-registry
+          image: busybox
+          command: ['sh', '-c', 'until nc -z schema-registry 8081; do echo "waiting for schema-registry..."; sleep 5; done']
+      containers:
+        - name: otel-collector
+          image: "{{ .Values.image.otelCollector }}"
+          env:
+            - name: OTEL_LOG_LEVEL
+              value: "debug"
+          imagePullPolicy: IfNotPresent
+          args: ["--config=/etc/otel-collector-config.yaml"]
+          ports:
+            - containerPort: {{ .Values.otelCollector.ports.main }}
+              name: otlp
+            - containerPort: {{ .Values.otelCollector.ports.zpages }}
+              name: zpages
+          volumeMounts:
+            - name: otel-config
+              mountPath: /etc/otel-collector-config.yaml
+              subPath: otel-collector-config.yaml
+      volumes:
+        - name: otel-config
+          configMap:
+            name: otel-collector-config

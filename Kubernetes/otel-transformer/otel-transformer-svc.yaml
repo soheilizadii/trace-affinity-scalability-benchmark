@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-transformer
+  labels:
+    app: teastore
+    run: otel-transformer
+spec:
+  type: ClusterIP
+  selector:
+    app: teastore
+    run: otel-transformer
+  ports:
+    - name: tcp
+      port: 10001
+      targetPort: 10001
+      protocol: TCP
+    - name: metrics
+      port: 9464
+      targetPort: 9464
+      protocol: TCP

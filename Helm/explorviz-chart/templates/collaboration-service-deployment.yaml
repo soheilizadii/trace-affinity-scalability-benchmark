@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collaboration-service
+  labels:
+    app: explorviz
+    run: collaboration-service
+spec:
+  replicas: {{ .Values.collaboration.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: collaboration-service
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: collaboration-service
+    spec:
+      securityContext:
+        fsGroup: 1000   
+      terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: wait-for-dependencies
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              echo "⏳ Waiting for Kafka and Schema Registry to be ready..."
+              until nc -z kafka 9092; do
+                echo "Kafka not ready yet... sleeping 5s"
+                sleep 5
+              done
+              until nc -z schema-registry 8081; do
+                echo "Schema Registry not ready yet... sleeping 5s"
+                sleep 5
+              done
+              echo "✅ All dependencies are ready. Starting collaboration-service!"
+      containers:
+        - name: collaboration-service
+          image: "{{ .Values.image.collaboration }}:{{ .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.collaboration.port }}
+              name: http
+          env:
+            {{- range $key, $value := .Values.collaboration.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+
+          # ✅ Optional health checks
+          # readinessProbe:
+          #   httpGet:
+          #     path: /q/health
+          #     port: {{ .Values.collaboration.port }}
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 5
+
+          # livenessProbe:
+          #   httpGet:
+          #     path: /q/health/live
+          #     port: {{ .Values.collaboration.port }}
+          #   initialDelaySeconds: 20
+          #   periodSeconds: 10

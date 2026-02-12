@@ -1,0 +1,171 @@
+apiVersion: theodolite.rocks/v1beta1
+kind: benchmark
+metadata:
+  name: teastore
+spec:
+  waitForResourcesEnabled: true
+  sut:
+    beforeActions:
+      - exec:
+          selector:
+            pod:
+              matchLabels:
+                statefulset.kubernetes.io/pod-name: kafka-0
+            container: kafka
+          timeoutSeconds: 180
+          command:
+            - sh
+            - -lc
+            - |
+              /usr/bin/kafka-consumer-groups \
+                --bootstrap-server kafka:9092 \
+                --group otel-transformer-group \
+                --reset-offsets --to-latest --execute \
+                --topic kieker-records || true
+    afterActions:
+      - exec:
+          selector:
+            pod:
+              matchLabels:
+                statefulset.kubernetes.io/pod-name: cassandra-0
+            container: cassandra
+          timeoutSeconds: 180
+          command:
+            - sh
+            - -lc
+            - |
+              set -e
+              echo "[AFTERACTION] $(date -Iseconds) truncate start on $(hostname)" >> /tmp/theodolite-afteractions.log
+              cqlsh -u cassandra -p cassandra -e "TRUNCATE explorviz.span_by_time; TRUNCATE explorviz.span_by_traceid; TRUNCATE explorviz.span_structure; TRUNCATE explorviz.trace_by_hash; TRUNCATE explorviz.trace_by_time; TRUNCATE explorviz.span_count_per_time_bucket_and_token; TRUNCATE explorviz.span_count_for_token_and_commit_and_time_bucket;" >> /tmp/theodolite-afteractions.log 2>&1
+              echo "[AFTERACTION] $(date -Iseconds) truncate done" >> /tmp/theodolite-afteractions.log
+    resources:
+      - configMap:
+          name: otel-transformer-deployment
+  loadGenerator:
+    resources:
+      - configMap:
+          name: teastore-jmeter-deployment
+  resourceTypes:
+    - typeName: "Instances"
+      patchers:
+        - type: "ReplicaPatcher"
+          resource: "teastore-auth-deployment.yaml"
+        - type: "ReplicaPatcher"
+          resource: "teastore-image-deployment.yaml"
+        - type: "ReplicaPatcher"
+          resource: "teastore-persistence-deployment.yaml"
+        - type: "ReplicaPatcher"
+          resource: "teastore-recommender-deployment.yaml"
+        # - type: "ReplicaPatcher"
+        #   resource: "teastore-registry-deployment.yaml"
+        - type: "ReplicaPatcher"
+          resource: "teastore-webui-deployment.yaml"
+    - typeName: "TransformerInstances"
+      patchers:
+        - type: "ReplicaPatcher"
+          resource: "otel-transformer-deployment.yaml"
+    - typeName: "InstancesWebUI"
+      patchers:
+        - type: "ReplicaPatcher"
+          resource: "teastore-webui-deployment.yaml"
+    - typeName: "PodResources"
+      patchers:
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-auth-deployment.yaml"
+          properties:
+            container: "teastore-auth"
+            limitedResource: cpu
+            format: m
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-auth-deployment.yaml"
+          properties:
+            container: "teastore-auth"
+            limitedResource: memory
+            format: Mi
+            factor: 2
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-auth-deployment.yaml"
+          properties:
+            container: "teastore-auth"
+            limitedResource: cpu
+            format: m
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-auth-deployment.yaml"
+          properties:
+            container: "teastore-auth"
+            limitedResource: memory
+            format: Mi
+            factor: 2
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-image-deployment.yaml"
+          properties:
+            container: "teastore-image"
+            limitedResource: cpu
+            format: m
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-image-deployment.yaml"
+          properties:
+            container: "teastore-image"
+            limitedResource: memory
+            format: Mi
+            factor: 2
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-recommender-deployment.yaml"
+          properties:
+            container: "teastore-recommender"
+            limitedResource: cpu
+            format: m
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-recommender-deployment.yaml"
+          properties:
+            container: "teastore-recommender"
+            limitedResource: memory
+            format: Mi
+            factor: 2
+        # - type: "ResourceLimitPatcher"
+        #   resource: "teastore-registry-deployment.yaml"
+        #   properties:
+        #     container: "teastore-registry"
+        #     limitedResource: cpu
+        #     format: m
+        # - type: "ResourceLimitPatcher"
+        #   resource: "teastore-registry-deployment.yaml"
+        #   properties:
+        #     container: "teastore-registry"
+        #     limitedResource: memory
+        #     format: Mi
+        #     factor: 2
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-webui-deployment.yaml"
+          properties:
+            container: "teastore-webui"
+            limitedResource: cpu
+            format: m
+        - type: "ResourceLimitPatcher"
+          resource: "teastore-webui-deployment.yaml"
+          properties:
+            container: "teastore-webui"
+            limitedResource: memory
+            format: Mi
+            factor: 2
+  loadTypes:
+    - typeName: NumUsers
+      patchers:
+        - type: "EnvVarPatcher"
+          resource: "jmeter.yaml"
+          properties:
+            container: jmeter
+            variableName: NUM_USERS
+  slos:
+    - sloType: "generic"
+      name: "transformerThroughput"
+      prometheusUrl: "http://prometheus-operated:9090"
+      offset: 0
+      properties:
+        externalSloUrl: "http://localhost:8082"
+        promQLQuery: "sum(rate(k2otel_spans_transformed_total[1m]))"
+        warmup: 100 #in seconds
+        queryAggregation: mean
+        repetitionAggregation: median
+        operator: gte
+        threshold: 12000

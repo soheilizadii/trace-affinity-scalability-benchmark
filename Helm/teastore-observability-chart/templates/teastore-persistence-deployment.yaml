@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-persistence
+  labels:
+    app: teastore
+    run: teastore-persistence
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-persistence
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+      labels:
+        app: teastore
+        run: teastore-persistence
+    spec:
+      terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: wait-for-teastore-registry
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for teastore-registry to be ready..."
+              until nc -z teastore-registry 8080; do
+                echo "Still waiting for teastore-registry on port 8080..."
+                sleep 3
+              done
+              echo "teastore-registry is ready!"
+        - name: wait-for-kieker-bridge
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for kieker-bridge service to be ready..."
+              until nc -z kieker-bridge 10001; do
+                echo "Still waiting for kieker-bridge on port 10001..."
+                sleep 3
+              done
+              echo "kieker-bridge is ready!"
+      containers:
+        - name: teastore-persistence
+          image: "{{ .Values.image.persistence }}:{{ .Values.image.tag }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: HOST_NAME
+              value: "teastore-persistence"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+            - name: DB_HOST
+              value: "teastore-db"
+            - name: DB_PORT
+              value: "{{ .Values.db.port }}"
+            - name: RABBITMQ_HOST
+              value: "teastore-rabbitmq"
+          volumeMounts:
+            - name: kieker-config
+              mountPath: /kieker/config/kieker.monitoring.properties
+              subPath: kieker.monitoring.properties
+          # readinessProbe:
+          #   httpGet:
+          #     path: /tools.descartes.teastore.persistence/rest/ready/isready
+          #     port: 8080
+          #     scheme: HTTP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /tools.descartes.teastore.persistence/rest/ready/isready
+          #     port: 8080
+          #     scheme: HTTP
+      volumes:
+        - name: kieker-config
+          configMap:
+            name: kieker-config

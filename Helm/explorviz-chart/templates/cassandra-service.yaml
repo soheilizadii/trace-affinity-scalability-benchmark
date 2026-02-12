@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  labels:
+    app: explorviz
+    run: cassandra
+spec:
+  clusterIP: None  # headless for StatefulSet
+  selector:
+    app: explorviz
+    run: cassandra
+  ports:
+    - name: cql
+      port: {{ .Values.cassandra.port }}
+      targetPort: {{ .Values.cassandra.port }}

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-lag-exporter
+  labels:
+    app: explorviz
+    run: kafka-lag-exporter
+spec:
+  replicas: {{ .Values.kafkaLagExporter.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: kafka-lag-exporter
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: kafka-lag-exporter
+    spec:
+      securityContext:
+        fsGroup: 1000   
+      terminationGracePeriodSeconds: 10
+      initContainers:
+        - name: wait-for-init-kafka
+          image: confluentinc/cp-kafka:7.3.0
+          command: ["sh", "-c", "until kafka-topics --bootstrap-server kafka:9092 --list | grep explorviz-spans; do echo 'Waiting for topics...'; sleep 5; done"]
+      containers:
+        - name: kafka-lag-exporter
+          image: "{{ .Values.image.kafkaLagExporter }}:{{ .Values.image.kafkaLagExporterTag }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - "bin/kafka-lag-exporter"
+            - "-Dconfig.file=/opt/docker/conf/application.conf"
+          ports:
+            - containerPort: {{ .Values.kafkaLagExporter.port }}
+              name: metrics
+          volumeMounts:
+            - name: kafka-lag-exporter-config
+              mountPath: /opt/docker/conf/application.conf
+              subPath: application.conf
+      volumes:
+        - name: kafka-lag-exporter-config
+          configMap:
+            name: kafka-lag-exporter-config

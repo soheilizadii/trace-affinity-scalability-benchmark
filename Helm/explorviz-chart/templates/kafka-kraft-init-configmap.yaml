@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-kraft-init
+  labels:
+    app: explorviz
+    run: kafka
+data:
+  kafka_kraft_init.sh: |
+{{ (.Files.Get "files/kafka/kafka_kraft_init.sh") | indent 4 }}

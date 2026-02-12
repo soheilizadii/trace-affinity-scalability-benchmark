@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schema-registry
+  labels:
+    app: explorviz
+    run: schema-registry
+spec:
+  replicas: {{ .Values.schemaRegistry.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: schema-registry
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: schema-registry
+    spec:
+      securityContext:
+        fsGroup: 1000   
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 10
+      initContainers:
+        - name: wait-for-kafka
+          image: confluentinc/cp-kafka:7.3.0
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Kafka readiness..."
+              until kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+                echo "Kafka not ready yet... sleeping 5s"
+                sleep 5
+              done
+              echo "✅ Kafka is ready!"
+      containers:
+        - name: schema-registry
+          image: "{{ .Values.image.schemaRegistry }}:{{ .Values.image.schemaRegistryTag }}"
+          command: ["/bin/bash","-lc","unset PORT; exec /etc/confluent/docker/run"]
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.schemaRegistry.port }}
+              name: http
+          env:
+            {{- range $key, $value := .Values.schemaRegistry.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          volumeMounts:
+            - name: schema-registry-secrets
+              mountPath: /etc/schema-registry/secrets
+          readinessProbe:
+             httpGet:
+               path: /subjects
+               port: {{ .Values.schemaRegistry.port }}
+             initialDelaySeconds: 10
+             periodSeconds: 5
+      volumes:
+        - name: schema-registry-secrets
+          emptyDir: {}

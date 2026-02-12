@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  labels:
+    app: explorviz
+    run: prometheus
+data:
+  prometheus.yml: |
+{{ .Files.Get "files/monitoring/prometheus/prometheus.yml" | indent 4 }}

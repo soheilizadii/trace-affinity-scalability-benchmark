@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: span-service
+  labels:
+    app: explorviz
+    run: span-service
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: explorviz
+    run: span-service
+  ports:
+    - name: http
+      port: {{ .Values.span.port }}
+      targetPort: http
+      protocol: TCP

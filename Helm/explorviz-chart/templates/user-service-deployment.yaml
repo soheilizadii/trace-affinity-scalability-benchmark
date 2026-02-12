@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  labels:
+    app: explorviz
+    run: user-service
+spec:
+  replicas: {{ .Values.user.replicaCount }}
+  selector:
+    matchLabels:
+      app: explorviz
+      run: user-service
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: explorviz
+        run: user-service
+    spec:
+      securityContext:
+        fsGroup: 1000        
+      terminationGracePeriodSeconds: 0
+      initContainers:
+        # 1️⃣ Wait for Kafka broker using Kafka CLI tools
+        - name: wait-for-kafka
+          image: confluentinc/cp-kafka:7.3.0
+          command:
+            - sh
+            - -c
+            - |
+              echo "⏳ Waiting for Kafka broker to be ready..."
+              until kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+                echo "Kafka not ready yet... sleeping 10s"
+                sleep 10
+              done
+              echo "✅ Kafka is ready!"
+
+          
+
+        # 2️⃣ Wait for Schema Registry + MongoDB (HTTP + port check)
+        - name: wait-for-schema-and-mongo
+          image: curlimages/curl:8.7.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "⏳ Waiting for Schema Registry and MongoDB readiness..."
+
+              # Wait for Schema Registry HTTP API
+              until curl -sf http://schema-registry:8081/subjects >/dev/null 2>&1; do
+                echo "Schema Registry not ready yet... sleeping 10s"
+                sleep 10
+              done
+              echo "✅ Schema Registry is ready!"
+
+              # Wait for MongoDB port
+              until nc -z mongo-user 27017; do
+                echo "MongoDB not ready yet... sleeping 5s"
+                sleep 5
+              done
+              echo "✅ MongoDB is ready!"
+
+              echo "✅ All dependencies are fully ready! Starting user-service..."
+      containers:
+        - name: user-service
+          image: "{{ .Values.image.user }}:{{ .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.user.port }}
+              name: http
+          env:
+            {{- range $key, $value := .Values.user.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+          # readinessProbe:
+          #   httpGet:
+          #     path: /q/health
+          #     port: {{ .Values.user.port }}
+          #   initialDelaySeconds: 20
+          #   periodSeconds: 5
+          # livenessProbe:
+          #   httpGet:
+          #     path: /q/health/live
+          #     port: {{ .Values.user.port }}
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 10

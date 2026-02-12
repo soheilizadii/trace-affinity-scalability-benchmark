@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-transformer
+  labels:
+    app: teastore
+    run: otel-transformer
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+
+  selector:
+    matchLabels:
+      app: teastore
+      run: otel-transformer
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: otel-transformer
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: otel-transformer
+          resources:
+            requests:
+              cpu: 500m
+              memory: 500Mi
+            limits:
+              cpu: 2000m
+              memory: 2000Mi
+          image: soheilizadii/otel-transformer:metrics
+          imagePullPolicy: Always
+          command: ["/app/bin/otel-transformer"]
+          args: ["-c", "/config/otel-transformer.properties"]
+
+          env:
+            - name: OTEL_TRANSFORMER_METRICS_PORT
+              value: "9464"
+            - name: KAFKA_INPUT
+              value: "true"
+            - name: INPUT_MODE
+              value: "kafka"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: KAFKA_TOPIC
+              value: "kieker-records"
+            - name: KAFKA_GROUP_ID
+              value: "otel-transformer-group"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms512m -Xmx1600m"
+            - name: TRACE_TIMEOUT_MS
+              value: "30000"
+            - name: KAFKA_QUEUE_CAPACITY
+              value: "20000"
+            - name: KAFKA_QUEUE_HIGH_WATERMARK_PCT
+              value: "80"
+            - name: KAFKA_QUEUE_LOW_WATERMARK_PCT
+              value: "20"
+            - name: KAFKA_POLL_TIMEOUT_MS
+              value: "250"
+            - name: KAFKA_ENQUEUE_WAIT_MS
+              value: "20"
+            - name: KAFKA_MAX_POLL_RECORDS
+              value: "200"
+            - name: KAFKA_MAX_POLL_INTERVAL_MS
+              value: "600000"
+            - name: KAFKA_RESUME_COOLDOWN_MS
+              value: "2000"
+          ports:
+            - name: tcp
+              containerPort: 10001
+              protocol: TCP
+            - name: metrics
+              containerPort: 9464
+              protocol: TCP
+
+          volumeMounts:
+            - name: otel-transformer-config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: otel-transformer-config
+          configMap:
+            name: otel-transformer-config
