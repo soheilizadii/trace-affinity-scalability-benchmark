@@ -28,9 +28,11 @@ In general, Theodolite can be installed using Helm.
 helm repo add theodolite https://www.theodolite.rocks
 helm repo update
 ```
-run the following command to install Theodolite:
+
+run the following command to install Theodolite without its internal Kafka setup:
 ```sh
-helm install theodolite theodolite/theodolite
+helm install theodolite theodolite/theodolite -f https://raw.githubusercontent.com/cau-se/theodolite/main/helm/preconfigs/kafka-less.yaml
+
 ```
 
 ### Create ConfigMaps containing all components
