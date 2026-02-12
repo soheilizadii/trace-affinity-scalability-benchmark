@@ -108,5 +108,5 @@ kubectl cp $(kubectl get pod -l app=theodolite -o jsonpath="{.items[0].metadata.
 Theodolite deploys Prometheus and Grafana (via its Helm chart). After installation, you can access Grafana locally via port-forward:
 
 ```sh
-kubectl port-forward -n theodolite svc/theodolite-grafana 8083:80
+kubectl port-forward  svc/theodolite-grafana 8083:80
 ```
